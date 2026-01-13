@@ -3,175 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圖片轉文字 (OCR) 神器</title>
+    <title>PDF 轉 PPTX 轉換器 (純前端)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/libs/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.min.js"></script>
 
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* 讓文字區域好看一點 */
-        .result-box {
-            min-height: 200px;
-            white-space: pre-wrap; /* 保留換行 */
-        }
+        /* 隱藏用於渲染的 canvas */
+        #render-container { position: absolute; top: -9999px; left: -9999px; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-xl overflow-hidden">
-        <div class="p-8">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">📸 圖片轉文字 (OCR)</h1>
-            <p class="text-gray-500 text-sm text-center mb-8">支援繁體中文與英文，完全在瀏覽器運行，無需上傳伺服器</p>
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-xl">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📄 PDF 轉 PPTX</h1>
+            <p class="text-gray-500 text-sm">將 PDF 每一頁轉換為 PowerPoint 圖片投影片</p>
+        </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                <div class="space-y-4">
-                    <div class="flex items-center justify-center w-full">
-                        <label for="image-upload" class="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100 transition-colors relative overflow-hidden">
-                            
-                            <div id="upload-placeholder" class="flex flex-col items-center justify-center pt-5 pb-6">
-                                <svg class="w-10 h-10 mb-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">點擊上傳圖片</span></p>
-                                <p class="text-xs text-gray-500">JPG, PNG, BMP</p>
-                            </div>
-
-                            <img id="image-preview" class="absolute inset-0 w-full h-full object-contain hidden bg-gray-900" />
-                            
-                            <input id="image-upload" type="file" accept="image/*" class="hidden" />
-                        </label>
+        <div class="space-y-6">
+            <div class="flex items-center justify-center w-full">
+                <label for="pdf-upload" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100 transition-colors">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg class="w-8 h-8 mb-4 text-blue-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                        </svg>
+                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">點擊上傳 PDF</span></p>
+                        <p class="text-xs text-gray-500" id="file-name">支援 .pdf 格式</p>
                     </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">辨識語言</label>
-                        <select id="lang-select" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                            <option value="chi_tra+eng">繁體中文 + 英文 (混合)</option>
-                            <option value="eng">僅英文 (English Only)</option>
-                            <option value="chi_tra">僅繁體中文</option>
-                        </select>
-                    </div>
-
-                    <button id="convert-btn" disabled class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2">
-                        開始辨識
-                    </button>
-
-                    <div id="progress-wrapper" class="hidden space-y-1">
-                        <div class="flex justify-between text-xs text-gray-600">
-                            <span id="status-text">初始化引擎...</span>
-                            <span id="percent-text">0%</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5">
-                            <div id="progress-bar" class="bg-green-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex flex-col h-full">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">辨識結果</label>
-                    <div class="relative flex-grow">
-                        <textarea id="result-text" class="w-full h-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-gray-800 focus:ring-blue-500 focus:border-blue-500 result-box resize-none" placeholder="文字將會顯示在這裡..." readonly></textarea>
-                        
-                        <button id="copy-btn" class="absolute top-2 right-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded shadow-sm hidden">
-                            複製文字
-                        </button>
-                    </div>
-                </div>
-
+                    <input id="pdf-upload" type="file" accept="application/pdf" class="hidden" />
+                </label>
             </div>
+
+            <button id="convert-btn" disabled class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2">
+                開始轉換
+            </button>
+
+            <div id="progress-container" class="hidden w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+            <div id="status-text" class="text-center text-sm text-gray-600 h-6"></div>
         </div>
     </div>
 
+    <div id="render-container"></div>
+
     <script>
-        const fileInput = document.getElementById('image-upload');
-        const imagePreview = document.getElementById('image-preview');
-        const uploadPlaceholder = document.getElementById('upload-placeholder');
+        // 設定 PDF.js Worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const fileInput = document.getElementById('pdf-upload');
+        const fileNameDisplay = document.getElementById('file-name');
         const convertBtn = document.getElementById('convert-btn');
-        const langSelect = document.getElementById('lang-select');
-        const resultText = document.getElementById('result-text');
-        const progressWrapper = document.getElementById('progress-wrapper');
         const progressBar = document.getElementById('progress-bar');
+        const progressContainer = document.getElementById('progress-container');
         const statusText = document.getElementById('status-text');
-        const percentText = document.getElementById('percent-text');
-        const copyBtn = document.getElementById('copy-btn');
+        const renderContainer = document.getElementById('render-container');
 
         let selectedFile = null;
 
-        // 1. 圖片預覽邏輯
+        // 監聽檔案選擇
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 selectedFile = e.target.files[0];
-                
-                // 顯示預覽圖
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    imagePreview.src = event.target.result;
-                    imagePreview.classList.remove('hidden');
-                    uploadPlaceholder.classList.add('hidden');
-                };
-                reader.readAsDataURL(selectedFile);
-
+                fileNameDisplay.textContent = `已選擇: ${selectedFile.name}`;
                 convertBtn.disabled = false;
-                resultText.value = "";
-                copyBtn.classList.add('hidden');
-                progressWrapper.classList.add('hidden');
+                convertBtn.textContent = "開始轉換";
+                statusText.textContent = "";
+                progressContainer.classList.add('hidden');
             }
         });
 
-        // 2. 執行 OCR
+        // 轉換核心邏輯
         convertBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
-            // UI 狀態重置
             convertBtn.disabled = true;
-            resultText.value = "處理中，請稍候...";
-            progressWrapper.classList.remove('hidden');
-            progressBar.style.width = '0%';
-            statusText.textContent = "載入核心...";
+            progressContainer.classList.remove('hidden');
             
-            const lang = langSelect.value;
-
             try {
-                // 使用 Tesseract.js 進行辨識
-                const { data: { text } } = await Tesseract.recognize(
-                    selectedFile,
-                    lang,
-                    {
-                        // Logger 用來更新進度條
-                        logger: m => {
-                            if (m.status === 'recognizing text') {
-                                const percent = Math.round(m.progress * 100);
-                                progressBar.style.width = `${percent}%`;
-                                percentText.textContent = `${percent}%`;
-                                statusText.textContent = `正在辨識文字...`;
-                            } else {
-                                statusText.textContent = m.status; // 顯示載入語言包等狀態
-                            }
-                        }
-                    }
-                );
+                // 1. 讀取 PDF 檔案
+                const arrayBuffer = await selectedFile.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const totalPages = pdf.numPages;
 
-                // 顯示結果
-                resultText.value = text;
+                // 2. 初始化 PPTX
+                const pptx = new PptxGenJS();
+                // 設定標題
+                pptx.title = selectedFile.name.replace('.pdf', '');
+
+                statusText.textContent = `正在處理... (共 ${totalPages} 頁)`;
+
+                // 3. 逐頁處理
+                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                    
+                    // 更新進度
+                    const percent = Math.round(((pageNum - 1) / totalPages) * 100);
+                    progressBar.style.width = `${percent}%`;
+                    statusText.textContent = `正在處理第 ${pageNum} / ${totalPages} 頁...`;
+
+                    // 取得頁面
+                    const page = await pdf.getPage(pageNum);
+                    
+                    // 設定渲染比例 (scale 2.0 = 2倍清晰度，避免 PPT 模糊)
+                    const scale = 2.0; 
+                    const viewport = page.getViewport({ scale: scale });
+
+                    // 建立 Canvas
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    // 渲染 PDF 到 Canvas
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+
+                    // 轉成圖片 Data URL
+                    const imgData = canvas.toDataURL('image/png');
+
+                    // 4. 計算 PPTX 投影片尺寸
+                    // PPTX 預設使用 Inches (英吋)，需要將 PDF 的 point 單位轉換
+                    // PDF.js viewport.width 是 point，72 dpi。
+                    // PptxGenJS 預設也是英吋。
+                    // 為了讓 PDF 填滿 PPT，我們動態設定該張投影片的大小
+                    
+                    // 將像素轉回 PPT 邏輯尺寸 (除以 scale) 再轉英吋 (除以 72)
+                    // 這裡簡化做法：直接告訴 PPTX 投影片要多大
+                    const slideWidth = viewport.width / scale / 72; 
+                    const slideHeight = viewport.height / scale / 72;
+
+                    // 5. 新增 PPTX 投影片
+                    // defineSlideMaster 可以用來設定不同頁面大小，但簡單做法是 addSlide 後設定背景圖
+                    // PptxGenJS 支援個別 Slide 的大小設定有點麻煩，
+                    // 比較通用的做法是讓圖片 "Fit" 進預設的 16:9 或 強制設定整個 PPT 的 layout。
+                    
+                    // 這裡我們採用「自定義 Layout」策略：
+                    // 為每一頁創建一個新的 layout (因為 PDF 可能混和橫向/直向)
+                    const layoutName = `LAYOUT_${pageNum}`;
+                    pptx.defineLayout({ name: layoutName, width: slideWidth, height: slideHeight });
+                    
+                    const slide = pptx.addSlide(layoutName);
+                    
+                    // 將圖片加入 Slide，並填滿
+                    slide.addImage({
+                        data: imgData,
+                        x: 0,
+                        y: 0,
+                        w: '100%',
+                        h: '100%'
+                    });
+
+                    // 釋放記憶體
+                    canvas.remove();
+                }
+
+                progressBar.style.width = `100%`;
+                statusText.textContent = "正在生成 PPTX 檔案...";
+
+                // 6. 下載檔案
+                await pptx.writeFile({ fileName: `${selectedFile.name.replace('.pdf', '')}.pptx` });
+
+                statusText.textContent = "🎉 轉換完成！檔案已下載。";
+                convertBtn.textContent = "再次轉換";
                 convertBtn.disabled = false;
-                convertBtn.innerText = "重新辨識";
-                copyBtn.classList.remove('hidden');
-                statusText.textContent = "完成！";
 
             } catch (error) {
                 console.error(error);
-                resultText.value = `❌ 發生錯誤: ${error.message}`;
+                statusText.textContent = `❌ 發生錯誤: ${error.message}`;
+                alert('轉換失敗，請檢查 Console。通常是因為 PDF 格式太複雜或記憶體不足。');
                 convertBtn.disabled = false;
             }
         });
-
-        // 3. 複製功能
-        copyBtn.addEventListener('click', () => {
-            resultText.select();
-            document.execCommand('copy');
-            const originalText = copyBtn.innerText;
-            copyBtn.innerText = "已複製！";
-            setTimeout(() => copyBtn.innerText = originalText, 2000);
-        });
-
     </script>
 </body>
 </html>
