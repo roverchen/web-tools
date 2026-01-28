@@ -158,6 +158,9 @@
                 const pptx = new PptxGenJS();
                 pptx.title = selectedFile.name.replace('.pdf', '');
 
+                // 取得所選模式 (移到迴圈外，避免 ReferenceError)
+                const mode = document.querySelector('input[name="mode"]:checked').value;
+
                 statusText.textContent = `準備處理 ${totalPages} 頁... (初次載入 OCR 引擎可能需時較久)`;
 
                 for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
@@ -173,9 +176,6 @@
                     const page = await pdf.getPage(pageNum);
                     const scale = 1.5;
                     const viewport = page.getViewport({ scale: scale });
-
-                    // 取得所選模式
-                    const mode = document.querySelector('input[name="mode"]:checked').value;
 
                     // 設定 PPT 版面 (使用 72 DPI 換算)
                     // PDF viewport.width 是 pt, PptxGenJS 需要 inches
