@@ -164,43 +164,62 @@
                     const slide = pptx.addSlide(layoutName);
 
                     if (mode === 'native') {
-                        // === 模式 B: 原生文字還原 (NotebookLM 適用) ===
-                        // 不做 OCR，直接抓取 PDF 內的文字物件
+                        // === 模式 B: 原生文字還原 (分離圖文模式) ===
 
-                        // 1. 取得文字內容
+                        // 1. 產生背景圖 (嘗試移除文字)
+                        // 使用 Proxy 攔截 Canvas Context 的繪圖指令，略過文字繪製
+                        const bgCanvas = document.createElement('canvas');
+                        bgCanvas.width = viewport.width;
+                        bgCanvas.height = viewport.height;
+                        const bgCtx = bgCanvas.getContext('2d');
+
+                        // 建立一個 "不畫文字" 的 Context Proxy
+                        const noTextCtx = new Proxy(bgCtx, {
+                            get(target, prop) {
+                                if (prop === 'fillText' || prop === 'strokeText') {
+                                    // 回傳空函數，什麼都不做
+                                    return () => { };
+                                }
+                                // 其他屬性/方法正常回傳
+                                let value = target[prop];
+                                if (typeof value === 'function') {
+                                    return function (...args) {
+                                        return value.apply(target, args);
+                                    };
+                                }
+                                return value;
+                            },
+                            set(target, prop, value) {
+                                target[prop] = value;
+                                return true;
+                            }
+                        });
+
+
+                        // 渲染到這個 "無字" 畫布
+                        // 注意: pdf.js 的 render 必須傳入 canvasContext
+                        await page.render({ canvasContext: noTextCtx, viewport: viewport }).promise;
+
+                        // 取得背景圖 (無字版)
+                        const bgImgData = bgCanvas.toDataURL('image/jpeg', 0.8);
+
+                        // 加入背景圖
+                        slide.addImage({ data: bgImgData, x: 0, y: 0, w: '100%', h: '100%' });
+
+                        // 2. 取得文字並疊加
                         const textContent = await page.getTextContent();
 
-                        // 2. 遍歷每一個文字項目
-                        // PDF 的座標原點在左下角，PPT 在左上角，需要轉換
-                        // 且字體大小、顏色等都需要轉換
-
                         textContent.items.forEach(item => {
-                            // item.str: 文字內容
-                            // item.transform: [scaleX, skewY, skewX, scaleY, tx, ty]
-                            // tx, ty 是座標
                             const tx = item.transform[4];
                             const ty = item.transform[5];
 
-                            // 簡化計算：只處理平移與字體大小
-                            // 轉換 Y 座標：PDF height - ty
-                            // 注意：PDF viewport 預設是 72 DPI (user unit)
-                            // PptxGenJS 的 x, y, w, h 若給數字預設是 inches
-
-                            // 這裡我們全部換算成 inches
-                            // page.view 是 [x1, y1, x2, y2]，通常 x1=0, y1=0
                             const pdfPageHeight = (page.view[3] - page.view[1]);
-
                             const pptX = tx / 72;
                             const pptY = (pdfPageHeight - ty) / 72;
 
-                            // 字體高度 (概略)
                             let fontSize = item.height || 12;
-                            // 有時候 item.height 是 0，要從 transform[3] (scaleY) 拿
                             if (fontSize === 0) fontSize = item.transform[3];
 
-                            // 修正位置：PDF 的 (tx, ty) 通常是文字的 baseline，而 PPT 是 Top-Left
-                            // 所以 Y 要再往上扣掉 fontSize 左右的高度
-                            // 但簡單起見，直接畫上去通常會稍微偏下一點點，尚可接受
                             const pptY_adjusted = pptY - (fontSize / 72);
 
                             slide.addText(item.str, {
@@ -208,14 +227,11 @@
                                 y: pptY_adjusted,
                                 fontSize: fontSize, // pt
                                 color: '000000', // 預設黑字
-                                // w: 'auto', // 自動寬度
+                                // 既然有背景圖，可以考慮加一點陰影或背景色確保可讀，但 User 要的是分離，先保持純字
                             });
                         });
 
-                        // 為了讓背景不是全白，如果原 PDF 有背景圖... 
-                        // 這邊簡單處理：不做背景，只做文字 (因為 NotebookLM 背景通常是裝飾)
-                        // 如果需要，可以先把整頁 render 成圖片放在最底層 (透明度高一點)？
-                        // 但這會讓檔案變很大且不乾淨，先只做文字。
+                        bgCanvas.remove();
 
                     } else {
                         // === 模式 A: 圖片 + OCR (既有邏輯) ===
