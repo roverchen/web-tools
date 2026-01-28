@@ -52,8 +52,8 @@
                 </label>
             </div>
 
-            <div class="flex items-center gap-4">
-                <label class="text-sm font-medium text-gray-700">辨識語言：</label>
+            <div class="flex items-center gap-4" id="ocr-lang-container" class="hidden">
+                <label class="text-sm font-medium text-gray-700">辨識語言 (僅 OCR 模式)：</label>
                 <select id="lang-select" class="flex-1 p-2 border border-gray-300 rounded text-sm">
                     <option value="chi_tra+eng">繁體中文 + 英文 (推薦)</option>
                     <option value="eng">僅英文 (速度快)</option>
@@ -78,7 +78,7 @@
             <div class="flex gap-4">
                 <button id="convert-btn" disabled
                     class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    開始轉換 & OCR
+                    開始轉換 (可編輯模式)
                 </button>
                 <button id="download-txt-btn" disabled
                     class="hidden flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
@@ -123,6 +123,25 @@
             }
         });
 
+        // 監聽模式切換以更新 UI
+        const modeRadios = document.querySelectorAll('input[name="mode"]');
+        const ocrLangContainer = document.getElementById('ocr-lang-container');
+
+        function updateUI() {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            if (mode === 'native') {
+                ocrLangContainer.classList.add('hidden');
+                convertBtn.textContent = "開始轉換 (分離圖文)";
+            } else {
+                ocrLangContainer.classList.remove('hidden');
+                convertBtn.textContent = "開始轉換 & OCR";
+            }
+        }
+
+        modeRadios.forEach(radio => radio.addEventListener('change', updateUI));
+        // 初始化 UI
+        updateUI();
+
         convertBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
@@ -145,7 +164,11 @@
                     // 更新進度
                     const percent = Math.round(((pageNum - 1) / totalPages) * 100);
                     progressBar.style.width = `${percent}%`;
-                    statusText.textContent = `[${pageNum}/${totalPages}] 正在渲染與辨識文字...`;
+                    if (mode === 'native') {
+                        statusText.textContent = `[${pageNum}/${totalPages}] 正在提取文字並分離背景...`;
+                    } else {
+                        statusText.textContent = `[${pageNum}/${totalPages}] 正在渲染與辨識文字...`;
+                    }
 
                     const page = await pdf.getPage(pageNum);
                     const scale = 1.5;
@@ -177,10 +200,10 @@
                         const noTextCtx = new Proxy(bgCtx, {
                             get(target, prop) {
                                 if (prop === 'fillText' || prop === 'strokeText') {
-                                    // 回傳空函數，什麼都不做
+                                    // 回傳空函數，攔截文字繪製
                                     return () => { };
                                 }
-                                // 其他屬性/方法正常回傳
+
                                 let value = target[prop];
                                 if (typeof value === 'function') {
                                     return function (...args) {
@@ -271,7 +294,11 @@
                 await pptx.writeFile({ fileName: `${selectedFile.name.replace('.pdf', '')}_OCR.pptx` });
 
                 // 準備 TXT 下載按鈕
-                statusText.textContent = "🎉 完成！PPT 已包含圖片與備忘稿文字。";
+                if (mode === 'native') {
+                    statusText.textContent = "🎉 完成！已生成圖文分離的可編輯 PPT。";
+                } else {
+                    statusText.textContent = "🎉 完成！OCR 文字已存入備忘稿。";
+                }
                 convertBtn.textContent = "再次轉換";
                 convertBtn.disabled = false;
                 langSelect.disabled = false;
