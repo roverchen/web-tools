@@ -1,23 +1,32 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF 轉 PPTX + OCR 文字分離</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    
+
     <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/libs/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.min.js"></script>
 
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        #render-container { position: absolute; top: -9999px; left: -9999px; }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        #render-container {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+        }
     </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
     <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl">
@@ -28,10 +37,13 @@
 
         <div class="space-y-6">
             <div class="flex items-center justify-center w-full">
-                <label for="pdf-upload" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100 transition-colors">
+                <label for="pdf-upload"
+                    class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100 transition-colors">
                     <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg class="w-8 h-8 mb-4 text-blue-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                        <svg class="w-8 h-8 mb-4 text-blue-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
+                            fill="none" viewBox="0 0 20 16">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                         </svg>
                         <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">點擊上傳 PDF</span></p>
                         <p class="text-xs text-gray-500" id="file-name">支援 .pdf 格式</p>
@@ -49,17 +61,35 @@
                 </select>
             </div>
 
+            <div class="flex items-center gap-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <label class="text-sm font-bold text-gray-700">轉換模式：</label>
+                <div class="flex gap-4">
+                    <label class="inline-flex items-center">
+                        <input type="radio" checked name="mode" value="ocr" class="form-radio text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700">OCR 圖片轉文字 (備忘稿)</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="mode" value="native" class="form-radio text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700 font-bold">原生文字還原 (可編輯)</span>
+                    </label>
+                </div>
+            </div>
+
             <div class="flex gap-4">
-                <button id="convert-btn" disabled class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <button id="convert-btn" disabled
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                     開始轉換 & OCR
                 </button>
-                <button id="download-txt-btn" disabled class="hidden flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                <button id="download-txt-btn" disabled
+                    class="hidden flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
                     下載純文字檔 (.txt)
                 </button>
             </div>
 
-            <div id="progress-container" class="hidden w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700 relative overflow-hidden">
-                <div id="progress-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+            <div id="progress-container"
+                class="hidden w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700 relative overflow-hidden">
+                <div id="progress-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-300"
+                    style="width: 0%"></div>
             </div>
             <div id="status-text" class="text-center text-sm text-gray-600 whitespace-pre-wrap"></div>
         </div>
@@ -100,7 +130,7 @@
             langSelect.disabled = true;
             progressContainer.classList.remove('hidden');
             allExtractedText = "";
-            
+
             try {
                 const arrayBuffer = await selectedFile.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -118,47 +148,104 @@
                     statusText.textContent = `[${pageNum}/${totalPages}] 正在渲染與辨識文字...`;
 
                     const page = await pdf.getPage(pageNum);
-                    // 解析度設為 1.5 倍以平衡 OCR 準確度與速度 (2.0 會有點慢)
-                    const scale = 1.5; 
+                    const scale = 1.5;
                     const viewport = page.getViewport({ scale: scale });
 
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
+                    // 取得所選模式
+                    const mode = document.querySelector('input[name="mode"]:checked').value;
 
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    const imgData = canvas.toDataURL('image/jpeg', 0.8); // 使用 JPEG 稍微壓縮以加速 OCR
-
-                    // ★ 執行 OCR (文字辨識)
-                    // 這一步最花時間
-                    const { data: { text } } = await Tesseract.recognize(
-                        imgData,
-                        langSelect.value,
-                        {
-                            // 這裡可以加入 logger 查看詳細進度，為了介面簡潔先省略
-                        }
-                    );
-
-                    // 累積文字
-                    allExtractedText += `--- 第 ${pageNum} 頁 ---\n${text}\n\n`;
-
-                    // 設定 PPT 版面
-                    const slideWidth = viewport.width / scale / 72; 
+                    // 設定 PPT 版面 (使用 72 DPI 換算)
+                    // PDF viewport.width 是 pt, PptxGenJS 需要 inches
+                    // 這裡 viewport.width 已經乘了 scale，所以要除回來
+                    const slideWidth = viewport.width / scale / 72;
                     const slideHeight = viewport.height / scale / 72;
                     const layoutName = `LAYOUT_${pageNum}`;
                     pptx.defineLayout({ name: layoutName, width: slideWidth, height: slideHeight });
-                    
                     const slide = pptx.addSlide(layoutName);
-                    
-                    // 加入圖片
-                    slide.addImage({ data: imgData, x: 0, y: 0, w: '100%', h: '100%' });
 
-                    // ★ 關鍵：將辨識出的文字加入 PPT 的「備忘稿 (Notes)」
-                    // 這樣既保留了圖片排版，又有了可編輯的文字
-                    slide.addNotes(text);
+                    if (mode === 'native') {
+                        // === 模式 B: 原生文字還原 (NotebookLM 適用) ===
+                        // 不做 OCR，直接抓取 PDF 內的文字物件
 
-                    canvas.remove();
+                        // 1. 取得文字內容
+                        const textContent = await page.getTextContent();
+
+                        // 2. 遍歷每一個文字項目
+                        // PDF 的座標原點在左下角，PPT 在左上角，需要轉換
+                        // 且字體大小、顏色等都需要轉換
+
+                        textContent.items.forEach(item => {
+                            // item.str: 文字內容
+                            // item.transform: [scaleX, skewY, skewX, scaleY, tx, ty]
+                            // tx, ty 是座標
+                            const tx = item.transform[4];
+                            const ty = item.transform[5];
+
+                            // 簡化計算：只處理平移與字體大小
+                            // 轉換 Y 座標：PDF height - ty
+                            // 注意：PDF viewport 預設是 72 DPI (user unit)
+                            // PptxGenJS 的 x, y, w, h 若給數字預設是 inches
+
+                            // 這裡我們全部換算成 inches
+                            // page.view 是 [x1, y1, x2, y2]，通常 x1=0, y1=0
+                            const pdfPageHeight = (page.view[3] - page.view[1]);
+
+                            const pptX = tx / 72;
+                            const pptY = (pdfPageHeight - ty) / 72;
+
+                            // 字體高度 (概略)
+                            let fontSize = item.height || 12;
+                            // 有時候 item.height 是 0，要從 transform[3] (scaleY) 拿
+                            if (fontSize === 0) fontSize = item.transform[3];
+
+                            // 修正位置：PDF 的 (tx, ty) 通常是文字的 baseline，而 PPT 是 Top-Left
+                            // 所以 Y 要再往上扣掉 fontSize 左右的高度
+                            // 但簡單起見，直接畫上去通常會稍微偏下一點點，尚可接受
+                            const pptY_adjusted = pptY - (fontSize / 72);
+
+                            slide.addText(item.str, {
+                                x: pptX,
+                                y: pptY_adjusted,
+                                fontSize: fontSize, // pt
+                                color: '000000', // 預設黑字
+                                // w: 'auto', // 自動寬度
+                            });
+                        });
+
+                        // 為了讓背景不是全白，如果原 PDF 有背景圖... 
+                        // 這邊簡單處理：不做背景，只做文字 (因為 NotebookLM 背景通常是裝飾)
+                        // 如果需要，可以先把整頁 render 成圖片放在最底層 (透明度高一點)？
+                        // 但這會讓檔案變很大且不乾淨，先只做文字。
+
+                    } else {
+                        // === 模式 A: 圖片 + OCR (既有邏輯) ===
+
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+                        const imgData = canvas.toDataURL('image/jpeg', 0.8);
+
+                        // ★ 執行 OCR (文字辨識)
+                        const { data: { text } } = await Tesseract.recognize(
+                            imgData,
+                            langSelect.value,
+                            { /* logger */ }
+                        );
+
+                        // 累積文字
+                        allExtractedText += `--- 第 ${pageNum} 頁 ---\n${text}\n\n`;
+
+                        // 加入圖片
+                        slide.addImage({ data: imgData, x: 0, y: 0, w: '100%', h: '100%' });
+
+                        // ★ 將辨識出的文字加入 PPT 的「備忘稿 (Notes)」
+                        slide.addNotes(text);
+
+                        canvas.remove();
+                    }
                 }
 
                 progressBar.style.width = `100%`;
@@ -197,4 +284,5 @@
         });
     </script>
 </body>
+
 </html>
