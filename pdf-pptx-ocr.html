@@ -64,13 +64,13 @@
             <div class="flex items-center gap-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                 <label class="text-sm font-bold text-gray-700">轉換模式：</label>
                 <div class="flex gap-4">
-                    <label class="inline-flex items-center">
-                        <input type="radio" checked name="mode" value="ocr" class="form-radio text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700">OCR 圖片轉文字 (備忘稿)</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="mode" value="native" checked class="form-radio text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700 font-bold">數位 PDF (文字可編輯，推薦 NotebookLM)</span>
                     </label>
-                    <label class="inline-flex items-center">
-                        <input type="radio" name="mode" value="native" class="form-radio text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700 font-bold">原生文字還原 (可編輯)</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="mode" value="ocr" class="form-radio text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700">掃描檔/圖片 (文字在備忘稿)</span>
                     </label>
                 </div>
             </div>
